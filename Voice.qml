@@ -11,6 +11,7 @@ Item {
     property string historyText: "—"
     property string activeModel: "tiny.en"
     property int activeMic: -1
+    property string activeMicName: "—"
 
     ListModel { id: micModel }
 
@@ -193,6 +194,13 @@ Item {
             SectionLabel {
                 title: "MICROPHONE (pick; restarts PTT)"
             }
+            Text {
+                text: "active: " + chip.activeMic + "  " + chip.activeMicName
+                color: Theme.fg
+                font.family: Theme.font
+                font.pixelSize: Theme.size
+                font.bold: true
+            }
             Repeater {
                 model: micModel
                 delegate: Text {
@@ -216,7 +224,7 @@ Item {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: micProc.running = true
+                    onClicked: { micProc.running = false; micReloadDelay.start(); }
                 }
             }
             SectionLabel {
@@ -259,7 +267,7 @@ Item {
 
     Process {
         id: micProc
-        command: ["/home/warpuppy/.local/bin/voice-mics.py"]
+        command: ["/home/warpuppy/.local/share/voice-dictation/.venv/bin/python", "/home/warpuppy/.local/bin/voice-mics.py"]
         running: true
         stdout: StdioCollector {
             onStreamFinished: {
@@ -267,16 +275,29 @@ Item {
                     var arr = JSON.parse(this.text.trim());
                     micModel.clear();
                     for (var i = 0; i < arr.length; i++) micModel.append(arr[i]);
+                    for (var j = 0; j < arr.length; j++) {
+                        if (arr[j].index === chip.activeMic) {
+                            chip.activeMicName = arr[j].name;
+                        }
+                    }
                 } catch (e) {}
             }
         }
     }
 
     Timer {
+        id: micReloadDelay
+        interval: 100
+        repeat: false
+        running: false
+        onTriggered: micProc.running = true
+    }
+
+    Timer {
         interval: 5000
         repeat: true
         running: true
-        onTriggered: micProc.running = true
+        onTriggered: { micProc.running = false; micProc.running = true; }
     }
 
     Process {
@@ -284,6 +305,6 @@ Item {
         property int micIndex: -1
         command: ["python3", "-c", "import json,pathlib; p=pathlib.Path('/home/warpuppy/.config/voice-ptt.json'); d=json.loads(p.read_text()); d['device']=" + setMicProc.micIndex + "; p.write_text(__import__('json').dumps(d,indent=2))"]
         running: false
-        onExited: { chip.activeMic = setMicProc.micIndex; restartProc.running = true; }
+        onExited: { chip.activeMic = setMicProc.micIndex; for (var i=0;i<micModel.count;i++){ if (micModel.get(i).index === chip.activeMic) chip.activeMicName = micModel.get(i).name; } restartProc.running = true; }
     }
 }
