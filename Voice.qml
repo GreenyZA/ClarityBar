@@ -10,6 +10,9 @@ Item {
     property string lastTranscript: "—"
     property string historyText: "—"
     property string activeModel: "tiny.en"
+    property int activeMic: -1
+
+    ListModel { id: micModel }
 
     implicitWidth: btn.implicitWidth
     implicitHeight: Theme.barH
@@ -82,6 +85,7 @@ Item {
                 try {
                     var obj = JSON.parse(this.text.trim());
                     if (obj.model_size) chip.activeModel = obj.model_size;
+                    if (obj.device !== undefined) chip.activeMic = obj.device;
                 } catch (e) {}
             }
         }
@@ -187,6 +191,35 @@ Item {
                 }
             }
             SectionLabel {
+                title: "MICROPHONE (pick; restarts PTT)"
+            }
+            Repeater {
+                model: micModel
+                delegate: Text {
+                    text: (model.index === chip.activeMic ? "● " : "  ") + model.index + ": " + model.name
+                    color: model.index === chip.activeMic ? Theme.fg : (model.ok16k ? Theme.accent : Theme.dim)
+                    font.family: Theme.font
+                    font.pixelSize: Theme.size
+                    font.bold: model.index === chip.activeMic
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: model.ok16k ? Qt.PointingHandCursor : Qt.ArrowCursor
+                        onClicked: { if (model.ok16k) { setMicProc.micIndex = model.index; setMicProc.running = true; } }
+                    }
+                }
+            }
+            Text {
+                text: "refresh mic list"
+                color: Theme.accent
+                font.family: Theme.font
+                font.pixelSize: Theme.captionSize
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: micProc.running = true
+                }
+            }
+            SectionLabel {
                 title: "FEATURE ROADMAP"
             }
             StatRow { label: "Mic level meter"; value: "live bars during record" }
@@ -222,5 +255,35 @@ Item {
         command: ["python3", "-c", "import json,p=__import__('pathlib').Path('/home/warpuppy/.config/voice-ptt.json');d=json.loads(p.read_text());d['model_size']='small.en';p.write_text(__import__('json').dumps(d,indent=2))"]
         running: false
         onExited: { chip.activeModel = 'small.en'; restartProc.running = true; }
+    }
+
+    Process {
+        id: micProc
+        command: ["/home/warpuppy/.local/bin/voice-mics.py"]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    var arr = JSON.parse(this.text.trim());
+                    micModel.clear();
+                    for (var i = 0; i < arr.length; i++) micModel.append(arr[i]);
+                } catch (e) {}
+            }
+        }
+    }
+
+    Timer {
+        interval: 5000
+        repeat: true
+        running: true
+        onTriggered: micProc.running = true
+    }
+
+    Process {
+        id: setMicProc
+        property int micIndex: -1
+        command: ["python3", "-c", "import json,pathlib; p=pathlib.Path('/home/warpuppy/.config/voice-ptt.json'); d=json.loads(p.read_text()); d['device']=" + setMicProc.micIndex + "; p.write_text(__import__('json').dumps(d,indent=2))"]
+        running: false
+        onExited: { chip.activeMic = setMicProc.micIndex; restartProc.running = true; }
     }
 }
