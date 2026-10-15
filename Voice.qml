@@ -103,6 +103,7 @@ Item {
         id: pop
         visible: false
         grabFocus: true
+        onOpened: micProc.running = false; micProc.running = true
         anchor.window: chip.barWindow
         anchor.item: chip
         anchor.edges: Edges.Bottom
@@ -268,7 +269,7 @@ Item {
     Process {
         id: micProc
         command: ["/home/warpuppy/.local/share/voice-dictation/.venv/bin/python", "/home/warpuppy/.local/bin/voice-mics.py"]
-        running: true
+        running: false
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
@@ -294,9 +295,17 @@ Item {
     }
 
     Timer {
+        id: micReloadDelay
+        interval: 100
+        repeat: false
+        running: false
+        onTriggered: micProc.running = true
+    }
+
+    Timer {
         interval: 5000
         repeat: true
-        running: true
+        running: false
         onTriggered: { micProc.running = false; micProc.running = true; }
     }
 
