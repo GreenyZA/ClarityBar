@@ -103,7 +103,11 @@ Item {
         id: pop
         visible: false
         grabFocus: true
-        onOpened: micProc.running = false; micProc.running = true
+        onVisibleChanged: {
+            if (!visible) return;
+            micProc.running = false;
+            micProc.running = true;
+        } 
         anchor.window: chip.barWindow
         anchor.item: chip
         anchor.edges: Edges.Bottom
@@ -284,14 +288,6 @@ Item {
                 } catch (e) {}
             }
         }
-    }
-
-    Timer {
-        id: micReloadDelay
-        interval: 100
-        repeat: false
-        running: false
-        onTriggered: micProc.running = true
     }
 
     Timer {
